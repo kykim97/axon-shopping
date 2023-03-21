@@ -20,13 +20,13 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 @RestController
-public class DeliveryStatusQueryController {
+public class DeliveryViewQueryController {
 
     private final QueryGateway queryGateway;
 
     private final ReactorQueryGateway reactorQueryGateway;
 
-    public DeliveryStatusQueryController(
+    public DeliveryViewQueryController(
         QueryGateway queryGateway,
         ReactorQueryGateway reactorQueryGateway
     ) {
@@ -34,15 +34,15 @@ public class DeliveryStatusQueryController {
         this.reactorQueryGateway = reactorQueryGateway;
     }
 
-    @GetMapping("/deliveryStatuses")
-    public CompletableFuture findAll(DeliveryStatusQuery query) {
+    @GetMapping("/deliveries")
+    public CompletableFuture findAll(DeliveryViewQuery query) {
         return queryGateway
             .query(
                 query,
-                ResponseTypes.multipleInstancesOf(DeliveryStatus.class)
+                ResponseTypes.multipleInstancesOf(DeliveryReadModel.class)
             )
             .thenApply(resources -> {
-                List modelList = new ArrayList<EntityModel<DeliveryStatus>>();
+                List modelList = new ArrayList<EntityModel<DeliveryReadModel>>();
 
                 resources
                     .stream()
@@ -50,7 +50,7 @@ public class DeliveryStatusQueryController {
                         modelList.add(hateoas(resource));
                     });
 
-                CollectionModel<DeliveryStatus> model = CollectionModel.of(
+                CollectionModel<DeliveryReadModel> model = CollectionModel.of(
                     modelList
                 );
 
@@ -58,15 +58,15 @@ public class DeliveryStatusQueryController {
             });
     }
 
-    @GetMapping("/deliveryStatuses/{id}")
+    @GetMapping("/deliveries/{id}")
     public CompletableFuture findById(@PathVariable("id") String id) {
-        DeliveryStatusSingleQuery query = new DeliveryStatusSingleQuery();
+        DeliveryViewSingleQuery query = new DeliveryViewSingleQuery();
         query.setId(id);
 
         return queryGateway
             .query(
                 query,
-                ResponseTypes.optionalInstanceOf(DeliveryStatus.class)
+                ResponseTypes.optionalInstanceOf(DeliveryReadModel.class)
             )
             .thenApply(resource -> {
                 if (!resource.isPresent()) {
@@ -83,34 +83,38 @@ public class DeliveryStatusQueryController {
             });
     }
 
-    EntityModel<DeliveryStatus> hateoas(DeliveryStatus resource) {
-        EntityModel<DeliveryStatus> model = EntityModel.of(resource);
+    EntityModel<DeliveryReadModel> hateoas(DeliveryReadModel resource) {
+        EntityModel<DeliveryReadModel> model = EntityModel.of(resource);
+
+        model.add(Link.of("/deliveries/" + resource.getId()).withSelfRel());
 
         model.add(
-            Link.of("/deliveryStatuses/" + resource.getId()).withSelfRel()
+            Link
+                .of("/deliveries/" + resource.getId() + "/events")
+                .withRel("events")
         );
 
         return model;
     }
 
-    @MessageMapping("deliveryStatuses.all")
-    public Flux<DeliveryStatus> subscribeAll() {
+    @MessageMapping("deliveries.all")
+    public Flux<DeliveryReadModel> subscribeAll() {
         return reactorQueryGateway.subscriptionQueryMany(
-            new DeliveryStatusQuery(),
-            DeliveryStatus.class
+            new DeliveryViewQuery(),
+            DeliveryReadModel.class
         );
     }
 
-    @MessageMapping("deliveryStatuses.{id}.get")
-    public Flux<DeliveryStatus> subscribeSingle(
+    @MessageMapping("deliveries.{id}.get")
+    public Flux<DeliveryReadModel> subscribeSingle(
         @DestinationVariable String id
     ) {
-        DeliveryStatusSingleQuery query = new DeliveryStatusSingleQuery();
+        DeliveryViewSingleQuery query = new DeliveryViewSingleQuery();
         query.setId(id);
 
         return reactorQueryGateway.subscriptionQuery(
             query,
-            DeliveryStatus.class
+            DeliveryReadModel.class
         );
     }
 }

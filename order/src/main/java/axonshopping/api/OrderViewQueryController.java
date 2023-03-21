@@ -20,13 +20,13 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 @RestController
-public class OrderStatusQueryController {
+public class OrderViewQueryController {
 
     private final QueryGateway queryGateway;
 
     private final ReactorQueryGateway reactorQueryGateway;
 
-    public OrderStatusQueryController(
+    public OrderViewQueryController(
         QueryGateway queryGateway,
         ReactorQueryGateway reactorQueryGateway
     ) {
@@ -34,12 +34,15 @@ public class OrderStatusQueryController {
         this.reactorQueryGateway = reactorQueryGateway;
     }
 
-    @GetMapping("/orderStatuses")
-    public CompletableFuture findAll(OrderStatusQuery query) {
+    @GetMapping("/orders")
+    public CompletableFuture findAll(OrderViewQuery query) {
         return queryGateway
-            .query(query, ResponseTypes.multipleInstancesOf(OrderStatus.class))
+            .query(
+                query,
+                ResponseTypes.multipleInstancesOf(OrderReadModel.class)
+            )
             .thenApply(resources -> {
-                List modelList = new ArrayList<EntityModel<OrderStatus>>();
+                List modelList = new ArrayList<EntityModel<OrderReadModel>>();
 
                 resources
                     .stream()
@@ -47,7 +50,7 @@ public class OrderStatusQueryController {
                         modelList.add(hateoas(resource));
                     });
 
-                CollectionModel<OrderStatus> model = CollectionModel.of(
+                CollectionModel<OrderReadModel> model = CollectionModel.of(
                     modelList
                 );
 
@@ -55,13 +58,16 @@ public class OrderStatusQueryController {
             });
     }
 
-    @GetMapping("/orderStatuses/{id}")
+    @GetMapping("/orders/{id}")
     public CompletableFuture findById(@PathVariable("id") String id) {
-        OrderStatusSingleQuery query = new OrderStatusSingleQuery();
+        OrderViewSingleQuery query = new OrderViewSingleQuery();
         query.setId(id);
 
         return queryGateway
-            .query(query, ResponseTypes.optionalInstanceOf(OrderStatus.class))
+            .query(
+                query,
+                ResponseTypes.optionalInstanceOf(OrderReadModel.class)
+            )
             .thenApply(resource -> {
                 if (!resource.isPresent()) {
                     return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
@@ -77,27 +83,36 @@ public class OrderStatusQueryController {
             });
     }
 
-    EntityModel<OrderStatus> hateoas(OrderStatus resource) {
-        EntityModel<OrderStatus> model = EntityModel.of(resource);
+    EntityModel<OrderReadModel> hateoas(OrderReadModel resource) {
+        EntityModel<OrderReadModel> model = EntityModel.of(resource);
 
-        model.add(Link.of("/orderStatuses/" + resource.getId()).withSelfRel());
+        model.add(Link.of("/orders/" + resource.getId()).withSelfRel());
+
+        model.add(
+            Link.of("/orders/" + resource.getId() + "/events").withRel("events")
+        );
 
         return model;
     }
 
-    @MessageMapping("orderStatuses.all")
-    public Flux<OrderStatus> subscribeAll() {
+    @MessageMapping("orders.all")
+    public Flux<OrderReadModel> subscribeAll() {
         return reactorQueryGateway.subscriptionQueryMany(
-            new OrderStatusQuery(),
-            OrderStatus.class
+            new OrderViewQuery(),
+            OrderReadModel.class
         );
     }
 
-    @MessageMapping("orderStatuses.{id}.get")
-    public Flux<OrderStatus> subscribeSingle(@DestinationVariable String id) {
-        OrderStatusSingleQuery query = new OrderStatusSingleQuery();
+    @MessageMapping("orders.{id}.get")
+    public Flux<OrderReadModel> subscribeSingle(
+        @DestinationVariable String id
+    ) {
+        OrderViewSingleQuery query = new OrderViewSingleQuery();
         query.setId(id);
 
-        return reactorQueryGateway.subscriptionQuery(query, OrderStatus.class);
+        return reactorQueryGateway.subscriptionQuery(
+            query,
+            OrderReadModel.class
+        );
     }
 }

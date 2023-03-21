@@ -3,7 +3,7 @@ package axonshopping.query;
 import lombok.Data;
 
 @Data
-public class DeliveryStatusSingleQuery {
+public class OrderViewSingleQuery {
 
     private String id;
 }
